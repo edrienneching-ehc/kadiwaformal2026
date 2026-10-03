@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta name="referrer" content="no-referrer"><base target="_top"></head><body>
+<script>
+  const bridge = <?!= JSON.stringify(bridge) ?>;
+  const allowedOrigin = <?!= JSON.stringify(allowedOrigin) ?>;
+  const methods = ['guest', 'login', 'logout', 'list', 'checkIn'];
+  window.addEventListener('message', function(event) {
+    const message = event.data;
+    if (event.source !== window.top || event.origin !== allowedOrigin || !message || message.bridge !== bridge || message.type !== 'kadiwa-request') return;
+    if (!methods.includes(message.method) || typeof message.id !== 'string') return;
+    const respond = function(payload) {
+      event.source.postMessage(Object.assign({ type: 'kadiwa-response', bridge: bridge, id: message.id }, payload), allowedOrigin);
+    };
+    google.script.run
+      .withSuccessHandler(function(result) { respond({ ok: true, result: result }); })
+      .withFailureHandler(function(error) { respond({ ok: false, error: error.message || 'The request could not be completed.' }); })
+      .eventRpc(message.method, message.args || {});
+  });
+  window.top.postMessage({ type: 'kadiwa-ready', bridge: bridge }, allowedOrigin);
+</script>
+</body></html>
