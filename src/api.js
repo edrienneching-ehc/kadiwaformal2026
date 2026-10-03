@@ -66,11 +66,8 @@ function connect() {
 export async function call(method, args = {}) {
   if (demo) {
     await new Promise(resolve => setTimeout(resolve, 100));
-    if (method === 'login') return { session: 'demo-session', name: args.name };
-    if (method === 'logout') return true;
-    if (method === 'list') return { guests: structuredClone(demoGuests) };
     if (method === 'guest' || method === 'checkIn') {
-      const guest = demoGuests.find(g => g.token === args.token || g.id === args.id);
+      const guest = demoGuests.find(g => g.token === args.token);
       if (!guest) throw new Error('Guest pass not found. Please approach the registration desk.');
       const alreadyCheckedIn = Boolean(guest.checkedInAt);
       if (method === 'checkIn' && !alreadyCheckedIn) guest.checkedInAt = new Date().toISOString();
@@ -84,7 +81,7 @@ export async function call(method, args = {}) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(new Error(method === 'checkIn' ? 'The response timed out. Refresh the guest list to confirm attendance before trying again.' : 'The request timed out. Please try again.'));
+      reject(new Error(method === 'checkIn' ? 'The response timed out. Refresh your pass to confirm attendance before trying again.' : 'The request timed out. Please try again.'));
     }, 30000);
     pending.set(id, { resolve, reject, timer });
     connection.send({ type: 'kadiwa-request', id, method, args });

@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdir, access } from 'node:fs/promises';
+import { mkdir, access, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4173/';
@@ -22,7 +22,19 @@ try {
     await page.locator('#guest-qr').evaluate(img => img.decode());
     assert.equal(await page.locator('img').evaluateAll(imgs => imgs.every(img => img.complete && img.naturalWidth > 0)), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `guest overflow at ${width}`);
+    assert.equal(await page.getByRole('link', { name: 'Volunteers' }).count(), 0);
     await page.screenshot({ path: fileURLToPath(new URL(`guest-${width}.png`, artifacts)), fullPage: true });
+    await page.getByRole('button', { name: "I'm here", exact: true }).click();
+    await page.getByText('You are checked in. Enjoy the evening!', { exact: true }).waitFor();
+    assert.equal(await page.locator('#self-check-in').count(), 0);
+    const arrival = await page.locator('.attendance-label').textContent();
+    await page.getByRole('button', { name: 'Refresh guest pass', exact: true }).click();
+    await page.getByText('You are checked in. Enjoy the evening!', { exact: true }).waitFor();
+    assert.equal(await page.locator('.attendance-label').textContent(), arrival);
+    const savedPass = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Save pass', exact: true }).click();
+    assert.equal((await savedPass).suggestedFilename(), 'kadiwa-pass-Alex-Santos.png');
+    await page.screenshot({ path: fileURLToPath(new URL(`checked-in-${width}.png`, artifacts)), fullPage: true });
     await page.getByRole('button', { name: 'Program', exact: true }).click();
     await page.getByText('The full program will be posted soon.').waitFor();
     await page.getByRole('button', { name: 'Reminders', exact: true }).click();
@@ -44,55 +56,52 @@ try {
   }
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   page.on('pageerror', error => errors.push(error.message));
+  await page.goto(base + '?demo=1&pass=' + '3'.repeat(64));
+  await page.getByRole('heading', { name: 'Sam Rivera', exact: true }).waitFor();
+  await page.getByText('Registration desk', { exact: true }).waitFor();
+  await page.getByRole('button', { name: "I'm here", exact: true }).click();
+  await page.getByText('You are checked in. Enjoy the evening!', { exact: true }).waitFor();
   await page.goto(base + '?demo=1&view=admin');
-  await page.getByLabel('Your name', { exact: true }).fill('Test Volunteer');
-  await page.getByLabel('Volunteer password', { exact: true }).fill('sample-preview');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await page.getByRole('button', { name: 'Check in Alex Santos', exact: true }).waitFor();
-  await page.screenshot({ path: fileURLToPath(new URL('volunteer-desktop.png', artifacts)), fullPage: true });
-  await page.getByRole('button', { name: 'Check in Alex Santos', exact: true }).click();
-  await page.getByText('CHECK-IN COMPLETE', { exact: true }).waitFor();
-  const checkedRow = page.getByRole('row').filter({ hasText: 'Alex Santos' });
-  assert.equal(await checkedRow.getByRole('button', { name: 'Already checked in', exact: true }).isDisabled(), true);
-  await page.getByLabel('Search guests').fill('north');
-  assert.equal(await page.locator('#roster tr').count(), 2);
-  await page.getByRole('button', { name: 'Arrived', exact: true }).click();
-  assert.equal(await page.getByText('No matching guests.').isVisible(), true);
-  await page.getByRole('button', { name: 'All', exact: true }).click();
-  await page.getByLabel('Search guests').fill('');
-  await page.getByRole('button', { name: 'View pass for Sam Rivera', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByText('Registration desk · North').waitFor();
-  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('button', { name: 'Print passes', exact: true }).click();
-  await page.getByText('6 passes ready', { exact: true }).waitFor();
-  assert.equal(await page.locator('.print-pass').count(), 6);
-  // Decode a generated pass through the same image-scanning path volunteers use.
-  const dataUrl = await page.locator('.print-pass').first().locator('img').getAttribute('src');
-  const qrPath = fileURLToPath(new URL('qr-sample.png', artifacts));
-  const { writeFile } = await import('node:fs/promises');
-  await writeFile(qrPath, Buffer.from(dataUrl.split(',')[1], 'base64'));
-  await page.screenshot({ path: fileURLToPath(new URL('print-passes.png', artifacts)), fullPage: true });
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByLabel('Upload QR image').setInputFiles(qrPath);
-  await page.getByText('ALREADY CHECKED IN', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
-  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('heading', { name: 'Alex Santos', exact: true }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Volunteer sign-in' }).count(), 0);
+
+  const fixtureUrl = new URL('__pass-tools-test', base).href;
+  const fixture = { siteUrl: base, guests: [
+    { name: 'Sample Guest', congregation: 'East', role: 'Attendee', table: 4, token: '1'.repeat(64) },
+    { name: '<b>Sample Performer</b>', congregation: 'North', role: 'Performer', table: 0, token: '3'.repeat(64) }
+  ] };
+  await page.route(fixtureUrl, route => route.fulfill({ contentType: 'text/html', body:
+    '<!doctype html><html><head><link rel="stylesheet" href="' + base + 'assets/style.css"></head><body class="pass-tools"><main id="pass-tools"></main>' +
+    '<script id="pass-data" type="application/json">' + JSON.stringify(fixture).replaceAll('<', '\\u003c') +
+    '</script><script type="module" src="' + base + 'assets/pass-tools.js"></script></body></html>' }));
+  await page.goto(fixtureUrl);
+  await page.getByText('2 passes ready', { exact: true }).waitFor();
+  assert.equal(await page.locator('.print-pass').count(), 2);
+  assert.equal(await page.locator('.print-pass h3 b').count(), 0);
+  await page.locator('.print-pass img').evaluateAll(imgs => Promise.all(imgs.map(img => img.decode())));
+  await page.screenshot({ path: fileURLToPath(new URL('private-pass-tools.png', artifacts)), fullPage: true });
+  const exportPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Invitation links CSV', exact: true }).click();
-  const download = await downloadPromise;
-  assert.equal(download.suggestedFilename(), 'kadiwa-invitation-links.csv');
+  assert.equal((await exportPromise).suggestedFilename(), 'kadiwa-invitation-links.csv');
+  const printPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download printable passes', exact: true }).click();
+  const printable = await printPromise;
+  const printablePath = fileURLToPath(new URL('sample-printable-passes.html', artifacts));
+  await printable.saveAs(printablePath);
+  const printableHtml = await readFile(printablePath, 'utf8');
+  assert.ok(printableHtml.includes('data:image/png;base64,'));
+  assert.ok(!printableHtml.includes('<button'));
+  const pngPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save pass', exact: true }).first().click();
+  assert.equal((await pngPromise).suggestedFilename(), 'kadiwa-pass-Sample-Guest.png');
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `admin overflow at ${width}`);
-    await page.screenshot({ path: fileURLToPath(new URL(`volunteer-${width}.png`, artifacts)), fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `private pass tools overflow at ${width}`);
   }
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await page.getByRole('heading', { name: 'Volunteer sign-in', exact: true }).waitFor();
-  assert.equal(await page.evaluate(() => sessionStorage.getItem('kadiwa-session')), null);
   await page.goto(base + '?pass=bad');
   await page.getByRole('heading', { name: 'Guest pass unavailable', exact: true }).waitFor();
   await page.goto(base);
   await page.getByRole('heading', { name: 'A seat at the celebration', exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: desktop/mobile, images, guest views, login, check-in, repeat QR image scan, exports, print passes, logout, and unconfigured state.');
+  console.log('Browser checks passed: desktop/mobile, guest self-check-in, repeat refresh, table-zero guests, QR images, pass downloads, private exports and printable passes, directions and unconfigured state.');
 } finally { await browser.close(); }

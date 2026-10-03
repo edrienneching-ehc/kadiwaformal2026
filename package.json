@@ -10,7 +10,6 @@
     "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {
-    "html5-qrcode": "2.3.8",
     "lucide": "0.468.0",
     "qrcode": "1.5.4"
   },

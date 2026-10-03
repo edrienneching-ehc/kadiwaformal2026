@@ -1,73 +1,62 @@
 # KADIWA Formal 2026
 
-Banner-themed guest passes, table assignments, program, reminders, volunteer QR scanning, attendance, and printable passes. GitHub Pages hosts the public website. A Google Apps Script web app reads the private seating list and records arrivals in a separate **Event Passes** tab.
+Banner-themed personal QR passes, table assignments, program, reminders and guest self-check-in. GitHub Pages hosts the public site; a Google Apps Script web app reads the seating list and saves arrivals in **Event Passes**.
 
-The finalized source has 170 people: 150 assigned across 15 tables, and 20 at table `0`. Table `0` displays **Registration desk**. The website never publishes the full guest list. The included preview uses six fictitious guests and does not record attendance.
+The source has 170 people: 150 across 15 tables, and 20 with table `0`, displayed as **Registration desk**. The public site never includes the full guest list. The sample preview uses fictitious people and does not save real attendance.
 
-## 1. Connect Google Sheets (one-time)
+## Connect Google Sheets
 
-1. Open the attendee spreadsheet, then **Extensions > Apps Script**. Use the same Google account that can edit the sheet.
-2. Replace the default `Code.gs` contents with [`apps-script/Code.gs`](apps-script/Code.gs).
-3. Click **+ > HTML**, name the file **Bridge**, and put the contents of [`apps-script/Bridge.html`](apps-script/Bridge.html) in it.
-4. In **Project Settings**, enable **Show appsscript.json manifest file in editor**. Replace that file with [`apps-script/appsscript.json`](apps-script/appsscript.json). Save the project as **KADIWA Formal 2026**.
-5. Reload the spreadsheet. Open **KADIWA Formal > Set up / reset volunteer password**. Authorize the script when prompted, then choose a password of at least 12 characters. Use a password unique to the event. This creates **Event Passes** without changing the seating or form-response tabs. Alternatively, run `setupKadiwa_` in the Apps Script editor, then return to the spreadsheet for the prompt.
-6. In Apps Script, click **Deploy > New deployment > Web app**. Set **Execute as: Me** and **Who has access: Anyone**. Click **Deploy** and copy the URL ending in `/exec`. An organization account may restrict the available access choices; check with its administrator if **Anyone** is unavailable.
-7. Put that URL into `backendUrl` in [`site-config.json`](site-config.json), keeping the quotation marks. Commit the change to `main`.
+1. Open the attendee spreadsheet and select **Extensions > Apps Script** using an account that can edit it.
+2. Replace `Code.gs` with [apps-script/Code.gs](apps-script/Code.gs).
+3. Add an HTML file named **Bridge**, or replace your existing one, with [apps-script/Bridge.html](apps-script/Bridge.html).
+4. In **Project Settings**, enable **Show appsscript.json manifest file in editor**. Use [apps-script/appsscript.json](apps-script/appsscript.json) for that file. If you already installed this manifest, leave it unchanged. Save.
+5. Reload the spreadsheet. Choose **KADIWA Formal > Set up guest passes** and authorize the script. No volunteer password is needed. Existing pass tokens and arrival records are preserved; the seating list is not changed.
+6. Choose **Deploy > New deployment > Web app**, with **Execute as: Me** and **Who has access: Anyone**. Deploy and copy the URL ending in `/exec`. If your organization does not allow **Anyone**, ask its administrator.
+7. Put the URL in `backendUrl` in [site-config.json](site-config.json), then commit to `main`.
 
-The `/exec` service reveals a guest record only to someone with that guest's random pass token. Listing all guests, exporting passes, and recording arrivals require a valid volunteer session. Keep the spreadsheet and the volunteer password restricted to organizers. Guest pass links are personal: share each with its intended guest.
+For an existing deployment, use **Deploy > Manage deployments > Edit > New version > Deploy** to keep the same URL. Saving code alone does not update a live deployment.
 
-## 2. Publish on GitHub
+## Generate QR Passes
 
-In the repository, open **Settings > Pages**, and select **GitHub Actions** as the publishing source. The **Publish Event Website** workflow publishes after commits to `main`. If needed, open **Actions > Publish Event Website > Run workflow**.
+1. In the spreadsheet choose **KADIWA Formal > Print / download guest passes**.
+2. **Save pass** under a guest downloads their personal PNG for sharing.
+3. **Download printable passes** downloads an HTML file containing all QR passes. Open it in a browser and choose **Print**, then **Save as PDF** or your printer. QR images are embedded so this file does not need internet to print.
+4. **Invitation links CSV** exports the private list of personal links. Links also appear in the **Personal Invitation Link** column of **Event Passes**.
 
-Expected website address, once the workflow succeeds:
+QR images are generated on your device, without sending guest details to a QR service. Keep the spreadsheet, CSV, printable file and guest links private. Send each guest only their own pass. Anyone with a personal link can see that guest's name, congregation, role and table, and check in as them.
 
-`https://edrienneching-ehc.github.io/kadiwaformal2026/`
+After adding guests or changing tables, use **KADIWA Formal > Refresh guest passes from seating list** before generating passes. Table changes preserve tokens. Names plus congregations identify guests; correcting capitalization or spaces preserves a pass, but changing a name's spelling or congregation creates a new one. Reissue that person's pass. Do not sort or edit **Event Passes** while arrivals are being recorded.
 
-Volunteer page:
+The private pass menu is available only to spreadsheet editors. There is no public roster, volunteer login or scanner dashboard.
 
-`https://edrienneching-ehc.github.io/kadiwaformal2026/?view=admin`
+## Guest Self-Check-In
 
-The public pages work before the Google connection is configured. Live guest passes and attendance require the connection. The local preview's `?demo=1` flag uses sample guests only; never distribute preview passes. The bridge is restricted to the live GitHub origin, so use the published site for the real Google connection.
+Guests scan their QR code using their phone's camera, or open their personal link. They see their name and table, then tap **I'm here** when they arrive. Opening a pass alone does not record attendance.
 
-## 3. Generate and distribute the QR passes
+The arrival time appears on their pass and in **Checked In At**, with **Self check-in** in **Checked In By**. Repeat taps preserve the first arrival time. Internet is required. On a timeout, use the refresh icon to check whether the arrival was recorded before retrying.
 
-1. Open the volunteer page and sign in using your name and the event's volunteer password.
-2. Click **Print passes**, then **Print / Save PDF**. The printable sheet contains one personal QR code per guest, with their name, congregation, role and table. It is sized for A4 paper.
-3. For an individual image, click the ticket icon beside a guest, then **Save pass**. This downloads a named PNG suitable for sending through your preferred messaging app.
-4. **Export > Invitation links CSV** downloads a private list of names and personal links for distribution. Guests can open their links directly or scan their printed QR code.
+This is an honor-based arrival system, not proof of physical presence. It does not collect location or require an account. Organizers monitor arrivals directly in **Event Passes**. For a guest without a working phone, an organizer can open that guest's personal link on another device.
 
-The QR codes are generated on your device, without sending guest details to a QR-code service. They point to `?pass=<random-token>` on the event site. Changing a table preserves its QR code. After adding people, choose **KADIWA Formal > Refresh guest passes from seating list** in the spreadsheet, or refresh the volunteer list.
+## Test Before Distribution
 
-Names plus congregations identify the people across sheet updates. Correcting only capitalization or extra spaces preserves a pass. Changing the spelling of a name or the congregation creates a new pass, so reissue it for that person. Do not sort or edit **Event Passes** while volunteers are registering guests; use **Seating Arrangement** for seating changes.
+- Open a real guest link on a phone and confirm the name, table and QR.
+- Tap **I'm here** and confirm the arrival cells in **Event Passes**.
+- Refresh the pass and verify the original arrival time is unchanged.
+- Check a table-zero guest sees **Registration desk**.
+- Change a test guest's table in **Seating Arrangement** and refresh their existing link.
+- Clear only the test guest's **Checked In At** and **Checked In By** cells before the event, then refresh their pass.
 
-## 4. Test before distributing
+## Publish and Update
 
-- On a phone, open a real guest link and check the name, table, QR image, program and reminders.
-- On a second device, open the volunteer page. Allow camera access and scan that guest pass, or upload a QR image. Name lookup is also available.
-- Confirm the arrival time and volunteer name appear in **Event Passes**. Refresh on another volunteer device to confirm the same result.
-- Scan the same pass again: it should say **Already checked in** and preserve the original arrival time.
-- Change that person's table in **Seating Arrangement** and refresh their existing pass. The table should update without changing the link.
-- After a trial check-in, the organizer can clear only that test person's **Checked In At** and **Checked In By** cells in **Event Passes**. Do this before registration opens, then refresh the volunteer screen.
+The **Publish Event Website** GitHub Actions workflow deploys commits to `main`. Under **Settings > Pages**, the source should be **GitHub Actions**.
 
-Camera scanning requires HTTPS and browser camera permission. If the camera is unavailable, use **QR image** or name lookup. Check-in requires internet. On a timeout, refresh attendance to confirm whether the arrival was recorded. The dashboard refreshes every 30 seconds; the refresh icon requests an immediate update. Volunteer sessions last up to six hours and may expire earlier if Google's cache is cleared; sign in again as needed.
+Live site: https://edrienneching-ehc.github.io/kadiwaformal2026/
 
-## Update the program and reminders
+Sample preview: https://edrienneching-ehc.github.io/kadiwaformal2026/?demo=1
 
-Edit [`site-config.json`](site-config.json), keeping valid JSON. Leave unconfirmed items empty. Example entries:
+The public event information works before the Google connection is configured, but real guest passes and attendance require it. Never distribute demo passes. The Google bridge accepts only the live site's origin.
 
-```json
-"program": [
-  { "time": "5:00 PM", "title": "Confirmed session title", "description": "Optional detail" }
-],
-"reminders": [
-  { "title": "Dress code", "text": "Your confirmed dress-code instructions." }
-]
-```
-
-`startsAt` already uses October 4, 2026, 5:00 PM Singapore time. Set `endsAt` only when the ending time is confirmed. Add `venueAddress` once the precise address is available. Commit to `main` to publish changes.
-
-After editing Apps Script code, use **Deploy > Manage deployments > Edit > New version > Deploy**. Keep the same deployment so the `/exec` URL stays unchanged. The Apps Script editor's save button alone does not update an existing live deployment.
+Edit [site-config.json](site-config.json) for confirmed program items, reminders and event details. The event starts October 4, 2026 at 5:00 PM Singapore time; the ending time is unconfirmed. The supplied MRT walking guides are under `assets/guides/`.
 
 ## Development
 
@@ -76,12 +65,11 @@ npm ci
 npm test
 npm run build
 npm run dev
+npm run test:browser
 ```
 
-Sample preview: `http://127.0.0.1:4173/?demo=1`
+Local sample: http://127.0.0.1:4173/?demo=1
 
-Sample volunteer screen: `http://127.0.0.1:4173/?demo=1&view=admin`
+Browser tests check desktop/mobile layouts, self-check-in, repeated refresh, QR images, private pass exports, downloads, directions and the unconfigured state. They use installed Chrome on macOS, or Playwright Chromium elsewhere.
 
-`npm run test:browser` checks desktop and mobile pages, check-in, duplicate scans, QR image decoding, printable passes, export, and rendering. It requires Playwright Chromium (`npx playwright install chromium`) and the preview server.
-
-Only `dist/` is uploaded to Pages. It includes public event content, the provided banner, and browser libraries. Apps Script source, attendee names, real QR tokens, volunteer credentials, exports, and test artifacts are excluded from the Pages build.
+Only `dist/` is uploaded to GitHub Pages. It contains public content, the banner, guides and browser libraries. Apps Script source, real guest names, QR tokens, exports and test artifacts are excluded.

@@ -14,5 +14,6 @@ await writeFile('dist/index.html', html);
 await cp('src/style.css', 'dist/assets/style.css');
 await cp('assets', 'dist/assets', { recursive: true });
 await build({ entryPoints: ['src/app.js'], bundle: true, minify: true, outfile: 'dist/assets/app.js', target: ['es2022'], format: 'esm', legalComments: 'eof' });
+await build({ entryPoints: ['src/pass-tools.js'], bundle: true, minify: true, outfile: 'dist/assets/pass-tools.js', target: ['es2022'], format: 'esm', legalComments: 'eof' });
 await writeFile('dist/.nojekyll', '');
 console.log('Built public website in dist/. No attendee list or server secrets are included.');

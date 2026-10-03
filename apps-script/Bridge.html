@@ -3,7 +3,7 @@
 <script>
   const bridge = <?!= JSON.stringify(bridge) ?>;
   const allowedOrigin = <?!= JSON.stringify(allowedOrigin) ?>;
-  const methods = ['guest', 'login', 'logout', 'list', 'checkIn'];
+  const methods = ['guest', 'checkIn'];
   window.addEventListener('message', function(event) {
     const message = event.data;
     if (event.source !== window.top || event.origin !== allowedOrigin || !message || message.bridge !== bridge || message.type !== 'kadiwa-request') return;
