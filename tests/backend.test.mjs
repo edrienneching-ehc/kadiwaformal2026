@@ -129,3 +129,21 @@ test('private pass modal escapes embedded JSON and has no public roster entry po
   assert.ok(html.includes('\\u003c/script>'));
   assert.ok(html.includes('assets/pass-tools.js'));
 });
+
+test('private pass printing recognizes Active values stored as text by Sheets', () => {
+  const b = backend();
+  let html;
+  b.context.HtmlService = { createHtmlOutput: value => { html = value; return { setWidth() { return this; }, setHeight() { return this; } }; } };
+  b.context.SpreadsheetApp.getUi = () => ({ showModalDialog() {} });
+  const sheet = b.sheets.get('Event Passes');
+  const getRange = sheet.getRange;
+  sheet.getRange = (...args) => {
+    const range = getRange(...args);
+    const getValues = range.getValues;
+    range.getValues = () => getValues().map(row => row.map(value => typeof value === 'boolean' ? String(value) : value));
+    return range;
+  };
+  b.run('showGuestPasses_()');
+  const data = JSON.parse(html.match(/<script id="pass-data" type="application\/json">(.*?)<\/script>/)[1]);
+  assert.equal(data.guests.length, 2);
+});

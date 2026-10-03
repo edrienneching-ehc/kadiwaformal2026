@@ -72,7 +72,7 @@ function eventRpc(method, args) {
 
 function showGuestPasses_() {
   syncGuestPasses_();
-  const rows = registryRows_().filter(row => row[8] === true);
+  const rows = registryRows_().filter(row => String(row[8]).toLowerCase() === 'true');
   const data = JSON.stringify({ siteUrl: KADIWA.siteUrl, guests: rows.map(guestObject_) }).replace(/</g, '\\u003c');
   const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">' +
     '<link rel="stylesheet" href="' + KADIWA.siteUrl + 'assets/style.css"></head><body class="pass-tools">' +
