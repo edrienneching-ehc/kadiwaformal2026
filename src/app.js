@@ -179,7 +179,7 @@ function friendlyLookupError(error) {
 function mapUrl() { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(config.venueAddress || config.venue + ', Singapore')}`; }
 function renderProgram() {
   document.querySelector('#guest-panel').innerHTML = `<div class="information-panel"><p class="eyebrow">THE EVENING</p><h2>Program</h2>
-    <ol class="program-list">${(config.program.length ? config.program : [{ time: timeText, title: 'KADIWA Formal', description: config.venue }]).map(item => `<li><time>${e(item.time)}</time><div><h3>${e(item.title)}</h3>${item.description ? '<p>' + e(item.description) + '</p>' : ''}</div></li>`).join('')}</ol>
+    <ol class="program-list">${(config.program.length ? config.program : [{ time: timeText, title: 'KADIWA Formal', description: config.venue }]).map(item => `<li${item.time ? ' class="has-time"' : ''}>${item.time ? '<time>' + e(item.time) + '</time>' : ''}<div><h3>${e(item.title)}</h3>${item.description ? '<p>' + e(item.description) + '</p>' : ''}</div></li>`).join('')}</ol>
     ${config.program.length ? '' : '<p class="pending-note">The full program will be posted soon.</p>'}<button class="button secondary" id="calendar">${icon('calendar-days')}Add to calendar</button></div>`;
   document.querySelector('#calendar').addEventListener('click', saveCalendar);
   paintIcons();

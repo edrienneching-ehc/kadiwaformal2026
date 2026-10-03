@@ -4,6 +4,7 @@ import { mkdir, access, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4173/';
+const config = JSON.parse(await readFile(new URL('../site-config.json', import.meta.url), 'utf8'));
 const artifacts = new URL('../test-results/', import.meta.url);
 await mkdir(artifacts, { recursive: true });
 let executablePath = process.env.CHROME_EXECUTABLE;
@@ -36,7 +37,20 @@ try {
     assert.equal((await savedPass).suggestedFilename(), 'kadiwa-pass-Alex-Santos.png');
     await page.screenshot({ path: fileURLToPath(new URL(`checked-in-${width}.png`, artifacts)), fullPage: true });
     await page.getByRole('button', { name: 'Program', exact: true }).click();
-    await page.getByText('The full program will be posted soon.').waitFor();
+    await page.getByRole('heading', { name: 'Dinner Buffet', exact: true }).waitFor();
+    assert.equal(config.program.length, 26);
+    assert.deepEqual(await page.locator('.program-list h3').allTextContents(), config.program.map(item => item.title));
+    assert.equal(await page.locator('.program-list time').count(), 0);
+    assert.equal(await page.getByText('The full program will be posted soon.').count(), 0);
+    assert.doesNotMatch(await page.locator('.program-list').textContent(), /Edrienne Honey Ching|Jess Alara|Jimmy Sonico|Person in Charge|Segment Owner/i);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `program overflow at ${width}`);
+    assert.equal(await page.locator('.program-list li').evaluateAll(items => items.every(item => {
+      const row = item.getBoundingClientRect();
+      const heading = item.querySelector('h3').getBoundingClientRect();
+      return heading.left >= row.left && heading.right <= row.right + 1;
+    })), true, `program headings fit at ${width}`);
+    await page.waitForFunction(() => !document.querySelector('#toast').classList.contains('visible'));
+    await page.screenshot({ path: fileURLToPath(new URL(`program-${width}.png`, artifacts)), fullPage: true });
     await page.getByRole('button', { name: 'Reminders', exact: true }).click();
     await page.getByRole('heading', { name: 'Photos and videos', exact: true }).waitFor();
     await page.getByText('Please arrive on time for the 5:00 PM start.', { exact: true }).waitFor();
@@ -135,5 +149,5 @@ try {
   await page.goto(base);
   await page.getByRole('heading', { name: 'A seat at the celebration', exact: true }).waitFor();
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: desktop/mobile, guest self-check-in, repeat refresh, table-zero guests, QR images, pass downloads, private exports and printable passes, directions and unconfigured state.');
+  console.log('Browser checks passed: desktop/mobile, program without times or owners, guest self-check-in, repeat refresh, table-zero guests, QR images, pass downloads, private exports and printable passes, directions and unconfigured state.');
 } finally { await browser.close(); }
