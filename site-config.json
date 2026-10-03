@@ -6,7 +6,7 @@
   "startsAt": "2026-10-04T17:00:00+08:00",
   "endsAt": null,
   "venue": "The Legacy @ One North",
-  "venueAddress": "",
+  "venueAddress": "11 Slim Barracks Rise, Singapore 138664 (NTU@one-north)",
   "program": [],
   "reminders": [
     {
@@ -22,5 +22,31 @@
       "text": "Please refrain from posting photos or videos of the event on social media until the official activity has aired on the official Church pages."
     }
   ],
-  "directions": []
+  "directions": [
+    {
+      "title": "From One-North MRT",
+      "walkingTime": "About 7–8 minutes on foot",
+      "steps": [
+        "Exit One-North MRT (CC23) and follow the signs toward One-North Park.",
+        "Walk toward and along One-North Park, keeping the park on your route.",
+        "Continue along the pedestrian path toward One-North Link.",
+        "Follow the path toward Slim Barracks Rise, then turn onto Slim Barracks Rise.",
+        "Continue until you reach No. 11, NTU@one-north."
+      ],
+      "pdf": "./assets/guides/one-north-mrt-walking-guide.pdf"
+    },
+    {
+      "title": "From Buona Vista MRT",
+      "walkingTime": "About 5–8 minutes on foot",
+      "steps": [
+        "At Buona Vista MRT, take Exit D.",
+        "Follow the pedestrian path toward North Buona Vista Road.",
+        "Walk along North Buona Vista Road toward the MOE building.",
+        "Continue past the MOE area. NTU@one-north is behind the MOE building.",
+        "Turn into Slim Barracks Rise.",
+        "Continue until you reach No. 11, NTU@one-north. The building is on your right when approaching from Buona Vista MRT."
+      ],
+      "pdf": "./assets/guides/buona-vista-mrt-walking-guide.pdf"
+    }
+  ]
 }

@@ -111,7 +111,8 @@ function renderProgram() {
 function renderReminders() {
   document.querySelector('#guest-panel').innerHTML = `<div class="information-panel"><p class="eyebrow">BEFORE YOU ARRIVE</p><h2>Reminders</h2>
     ${config.reminders.length ? '<ul class="reminder-list">' + config.reminders.map(item => `<li><h3>${e(item.title)}</h3><p>${e(item.text)}</p></li>`).join('') + '</ul>' : '<p class="pending-note">Event reminders will be posted soon.</p>'}
-    <div class="venue-details">${icon('map-pin')}<div><h3>Getting there</h3><p>${e(config.venue)}</p>${config.venueAddress ? '<p>' + e(config.venueAddress) + '</p>' : ''}${config.directions?.length ? '<ol class="directions-list">' + config.directions.map(step => '<li>' + e(step) + '</li>').join('') + '</ol>' : ''}<a href="${e(mapUrl())}" target="_blank" rel="noopener noreferrer">View on Google Maps</a></div></div></div>`;
+    <div class="venue-details">${icon('map-pin')}<div><h3>Getting there</h3><p>${e(config.venue)}</p>${config.venueAddress ? '<p>' + e(config.venueAddress) + '</p>' : ''}<a href="${e(mapUrl())}" target="_blank" rel="noopener noreferrer">View on Google Maps</a>
+      ${config.directions?.length ? '<div class="walking-routes">' + config.directions.map(route => `<details class="walking-route"><summary><span><strong>${e(route.title)}</strong><span class="walking-time">${e(route.walkingTime)}</span></span>${icon('chevron-down')}</summary><ol class="directions-list">${route.steps.map(step => '<li>' + e(step) + '</li>').join('')}</ol><a class="button secondary guide-link" href="${e(route.pdf)}" target="_blank" rel="noopener noreferrer">${icon('download')}Walking guide (PDF)<span class="sr-only"> — ${e(route.title)}</span></a></details>`).join('') + '</div>' : ''}</div></div></div>`;
   paintIcons();
 }
 function download(content, type, filename) {

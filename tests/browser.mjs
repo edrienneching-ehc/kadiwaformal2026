@@ -29,6 +29,17 @@ try {
     await page.getByRole('heading', { name: 'Photos and videos', exact: true }).waitFor();
     await page.getByText('Please arrive on time for the 5:00 PM start.', { exact: true }).waitFor();
     await page.getByRole('heading', { name: 'Getting there', exact: true }).waitFor();
+    await page.getByText('From One-North MRT', { exact: true }).click();
+    await page.getByText('Continue until you reach No. 11, NTU@one-north.', { exact: true }).waitFor();
+    await page.getByText('From Buona Vista MRT', { exact: true }).click();
+    await page.getByText('At Buona Vista MRT, take Exit D.', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `directions overflow at ${width}`);
+    for (const link of await page.locator('.guide-link').all()) {
+      const response = await page.request.get(new URL(await link.getAttribute('href'), base).href);
+      assert.equal(response.status(), 200);
+      assert.equal((await response.body()).subarray(0, 5).toString(), '%PDF-');
+    }
+    await page.screenshot({ path: fileURLToPath(new URL(`directions-${width}.png`, artifacts)), fullPage: true });
     await page.close();
   }
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
