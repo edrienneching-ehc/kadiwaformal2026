@@ -52,6 +52,38 @@ try {
       assert.equal((await response.body()).subarray(0, 5).toString(), '%PDF-');
     }
     await page.screenshot({ path: fileURLToPath(new URL(`directions-${width}.png`, artifacts)), fullPage: true });
+
+    await page.goto(base + '?demo=1&find=1');
+    await page.getByRole('heading', { name: 'Find your guest pass', exact: true }).waitFor();
+    await page.getByLabel('Local Congregation', { exact: true }).fill('East');
+    await page.getByLabel('Registered contact number', { exact: true }).fill('89998888');
+    await page.getByRole('button', { name: 'Find my pass', exact: true }).click();
+    await page.getByText('No matching pass was found.', { exact: false }).waitFor();
+    await page.getByLabel('Registered contact number', { exact: true }).fill('+65 8123 4567');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `lookup overflow at ${width}`);
+    await page.screenshot({ path: fileURLToPath(new URL(`lookup-${width}.png`, artifacts)), fullPage: true });
+    await page.getByRole('button', { name: 'Find my pass', exact: true }).click();
+    await page.getByRole('heading', { name: 'Select your name', exact: true }).waitFor();
+    assert.equal(await page.locator('#guest-name option').count(), 3);
+    assert.equal(await page.locator('#guest-name').textContent(), 'Select your nameAlex SantosAvery Santos');
+    await page.getByLabel('Full name', { exact: true }).selectOption('demo-1');
+    await page.getByRole('button', { name: 'Open my pass', exact: true }).click();
+    await page.getByRole('heading', { name: 'Alex Santos', exact: true }).waitFor();
+    await page.getByText('Not checked in yet', { exact: true }).waitFor();
+    assert.ok(page.url().includes('pass='));
+    assert.ok(!page.url().includes('8123'));
+    await page.goto(base + '?demo=1&find=1');
+    await page.getByLabel('Local Congregation', { exact: true }).fill('North');
+    await page.getByLabel('Registered contact number', { exact: true }).fill('87654321');
+    await page.getByRole('button', { name: 'Find my pass', exact: true }).click();
+    await page.getByRole('heading', { name: 'Select your name', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Open my pass', exact: true }).click();
+    await page.getByRole('heading', { name: 'Sam Rivera', exact: true }).waitFor();
+    await page.getByText('Registration desk', { exact: true }).waitFor();
+    await page.getByText('Not checked in yet', { exact: true }).waitFor();
+    const qr = await page.request.get(base + 'assets/event-qr.png');
+    assert.equal(qr.status(), 200);
+    assert.equal((await qr.body()).subarray(1, 4).toString(), 'PNG');
     await page.close();
   }
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });

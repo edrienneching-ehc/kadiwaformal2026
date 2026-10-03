@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import vm from 'node:vm';
 
 function backend() {
@@ -27,19 +27,25 @@ function backend() {
   };
   const source = sheet('Seating Arrangement', [['Full Name', 'Local Congregation', 'Table No', 'Role'], ['Alex Santos', 'East', 4, 'Attendee'], ['Sam Rivera', 'North', 0, 'Performer']]);
   sheets.set(source.name, source);
+  const responses = sheet('Form Responses 1', [
+    ['Full Name', 'Timestamp', 'Full Name', 'Contact Number', 'Local Congregation'],
+    ['Alex Santos', '', 'Alex Santos', '+65 8123 4567', 'East'],
+    ['Sam Rivera', '', 'Sam Rivera', '87654321', 'North']
+  ]);
+  sheets.set(responses.name, responses);
   const book = { getSheetByName: name => sheets.get(name), insertSheet: name => { const s = sheet(name); sheets.set(name, s); return s; } };
   const context = vm.createContext({
     SpreadsheetApp: { openById: () => book, flush() {} },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: key => properties.get(key) || null, setProperties: obj => { for (const [k,v] of Object.entries(obj)) properties.set(k,v); } }) },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key) || null, put: (key, value) => cache.set(key, value), remove: key => cache.delete(key) }) },
-    Utilities: { getUuid: randomUUID }
+    Utilities: { getUuid: randomUUID, DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_, value) => Array.from(createHash('sha256').update(value).digest()) }
   });
   vm.runInContext(readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8'), context);
   const run = expression => vm.runInContext(expression, context);
   properties.set('SETUP_DONE', 'true');
   run('syncGuestPasses_()');
-  return { run, source, sheets, properties, cache, context };
+  return { run, source, responses, sheets, properties, cache, context };
 }
 
 test('only a personal token can look up or check in one guest; roster operations are unavailable', () => {
@@ -146,4 +152,53 @@ test('private pass printing recognizes Active values stored as text by Sheets', 
   b.run('showGuestPasses_()');
   const data = JSON.parse(html.match(/<script id="pass-data" type="application\/json">(.*?)<\/script>/)[1]);
   assert.equal(data.guests.length, 2);
+});
+
+test('phone lookup normalizes Singapore formats and never returns phone numbers or pass tokens in the name list', () => {
+  const b = backend();
+  for (const contact of ['81234567', '+65 8123-4567', '006581234567']) {
+    const result = b.run(`eventRpc('findPasses', {congregation:'  EAST  ', contact:'${contact}'})`);
+    assert.equal(result.guests.length, 1);
+    assert.equal(result.guests[0].name, 'Alex Santos');
+    assert.deepEqual(Object.keys(result.guests[0]).sort(), ['id', 'name']);
+    const guest = b.run(`eventRpc('openPass', {lookupSession:'${result.lookupSession}', id:'${result.guests[0].id}'}).guest`);
+    assert.equal(guest.name, 'Alex Santos');
+    assert.equal(guest.checkedInAt, null);
+    assert.equal(b.sheets.get('Event Passes').rows[1][6], '');
+  }
+});
+test('lookup requires the full registered number and matching congregation', () => {
+  const b = backend();
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'4567'})"), /full registered/);
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'North', contact:'81234567'})"), /No matching/);
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'81234568'})"), /No matching/);
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'81234567abc'})"), /full registered/);
+});
+test('shared-number name choices contain only matching guests, and sessions cannot open unrelated passes', () => {
+  const b = backend();
+  b.source.rows.push(['Avery Santos', 'East', 5, 'Attendee']);
+  b.responses.rows.push(['Avery Santos', '', 'Avery Santos', '81234567', 'East']);
+  b.run('syncGuestPasses_()');
+  const result = b.run("eventRpc('findPasses', {congregation:'East', contact:'81234567'})");
+  assert.equal(result.guests.length, 2);
+  const unrelatedId = b.sheets.get('Event Passes').rows[2][0];
+  assert.throws(() => b.run(`eventRpc('openPass', {lookupSession:'${result.lookupSession}', id:'${unrelatedId}'})`), /find your pass again/);
+  assert.throws(() => b.run(`eventRpc('openPass', {lookupSession:'bad', id:'${result.guests[0].id}'})`), /find your pass again/);
+  b.source.rows.splice(1,1);
+  assert.throws(() => b.run(`eventRpc('openPass', {lookupSession:'${result.lookupSession}', id:'${result.guests[0].id}'})`), /find your pass again/);
+  b.cache.delete('pass-lookup-' + result.lookupSession);
+  assert.throws(() => b.run(`eventRpc('openPass', {lookupSession:'${result.lookupSession}', id:'${result.guests[1].id}'})`), /find your pass again/);
+});
+test('updated registration contact numbers revoke the old lookup match', () => {
+  const b = backend();
+  b.responses.rows.push(['Alex Santos', '', 'Alex Santos', '89998888', 'East']);
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'81234567'})"), /No matching/);
+  assert.equal(b.run("eventRpc('findPasses', {congregation:'East', contact:'89998888'}).guests.length"),1);
+});
+test('repeated lookup attempts are throttled without changing attendance', () => {
+  const b = backend();
+  for (let i=0; i<8; i++) assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'89998888'})"), /No matching/);
+  assert.throws(() => b.run("eventRpc('findPasses', {congregation:'East', contact:'89998888'})"), /Too many attempts/);
+  assert.equal(b.sheets.get('Event Passes').rows[1][6], '');
+  assert.equal([...b.cache.keys()].some(key => key.includes('89998888')),false);
 });

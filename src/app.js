@@ -13,7 +13,7 @@ const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const dateText = new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(config.startsAt));
 const timeText = new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(config.startsAt));
 const formatTime = date => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(date));
-const state = { view: 'pass', guest: null, busy: false };
+const state = { view: 'pass', guest: null, busy: false, lookup: null };
 let toastTimer;
 
 function paintIcons() { createIcons({ icons, attrs: { 'stroke-width': 1.6 } }); }
@@ -65,9 +65,10 @@ async function renderPass() {
   const panel = document.querySelector('#guest-panel');
   if (!panel) return;
   let token = params.get('pass');
-  if (isDemo() && !token) token = '1'.repeat(64);
+  if (isDemo() && !token && params.get('find') !== '1') token = '1'.repeat(64);
+  if (!token && params.get('find') === '1') { renderFinder(); return; }
   if (!token) {
-    panel.innerHTML = `<div class="empty-pass"><div class="stamp">${icon('ticket')}</div><p class="eyebrow">YOUR INVITATION</p><h2>A seat at the celebration</h2><p>Your personal guest pass will appear here when you open your invitation link.</p><div class="public-actions"><button class="button secondary" id="calendar">${icon('calendar-days')}Add to calendar</button><a class="button secondary" target="_blank" rel="noopener noreferrer" href="${e(mapUrl())}">${icon('map-pin')}Venue</a></div></div>`;
+    panel.innerHTML = `<div class="empty-pass"><div class="stamp">${icon('ticket')}</div><p class="eyebrow">YOUR INVITATION</p><h2>A seat at the celebration</h2><p>Your personal guest pass will appear here when you open your invitation link.</p><div class="public-actions"><a class="button primary" href="${e(finderUrl())}">${icon('ticket')}Find my pass</a><button class="button secondary" id="calendar">${icon('calendar-days')}Add to calendar</button><a class="button secondary" target="_blank" rel="noopener noreferrer" href="${e(mapUrl())}">${icon('map-pin')}Venue</a></div></div>`;
     document.querySelector('#calendar').addEventListener('click', saveCalendar);
     paintIcons();
     return;
@@ -96,6 +97,84 @@ async function renderPass() {
     document.querySelector('#retry-pass').addEventListener('click', renderPass);
     paintIcons();
   }
+}
+
+function finderUrl() {
+  const url = new URL(demoLink());
+  url.searchParams.set('find', '1');
+  return url.href;
+}
+function renderFinder() {
+  const panel = document.querySelector('#guest-panel');
+  const lookup = state.lookup;
+  if (lookup) {
+    panel.innerHTML = '<div class="information-panel"><p class="eyebrow">YOUR INVITATION</p><h2>Select your name</h2>' +
+      '<p class="lookup-local">' + e(lookup.congregation) + '</p><form class="lookup-form" id="select-pass">' +
+      '<label for="guest-name">Full name</label><select id="guest-name" required>' +
+      (lookup.guests.length > 1 ? '<option value="">Select your name</option>' : '') +
+      lookup.guests.map(g => '<option value="' + e(g.id) + '">' + e(g.name) + '</option>').join('') +
+      '</select><p class="lookup-error" id="lookup-error" role="alert"></p><div class="public-actions">' +
+      '<button class="button primary" type="submit">' + icon('ticket') + 'Open my pass</button>' +
+      '<button class="button secondary" id="lookup-back" type="button">Back</button></div></form></div>';
+    document.querySelector('#lookup-back').addEventListener('click', () => { state.lookup = null; renderFinder(); });
+    document.querySelector('#select-pass').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('[type="submit"]');
+      button.disabled = true;
+      try {
+        const result = await call('openPass', { lookupSession: lookup.lookupSession, id: form.querySelector('select').value });
+        state.guest = result.guest;
+        params.delete('find');
+        params.set('pass', result.guest.token);
+        history.replaceState(null, '', guestLink(result.guest.token));
+        state.lookup = null;
+        state.view = 'pass';
+        renderGuest();
+        await renderPass();
+      } catch (error) {
+        if (form.isConnected) form.querySelector('#lookup-error').textContent = friendlyLookupError(error);
+      } finally { button.disabled = false; }
+    });
+  } else {
+    panel.innerHTML = '<div class="information-panel"><p class="eyebrow">YOUR INVITATION</p><h2>Find your guest pass</h2>' +
+      '<form class="lookup-form" id="find-pass"><label for="lookup-local">Local Congregation</label>' +
+      '<input id="lookup-local" name="congregation" list="local-options" autocomplete="organization" required maxlength="100">' +
+      '<datalist id="local-options">' + (config.congregations || []).map(local => '<option value="' + e(local) + '"></option>').join('') +
+      '</datalist><label for="lookup-contact">Registered contact number</label>' +
+      '<input id="lookup-contact" name="contact" type="tel" autocomplete="tel" required minlength="8" maxlength="30">' +
+      '<p class="lookup-error" id="lookup-error" role="alert"></p><button class="button primary" type="submit">' +
+      icon('ticket') + 'Find my pass</button></form><p class="lookup-help">No matching pass? Please approach registration or use your personal invitation link.</p></div>';
+    document.querySelector('#find-pass').addEventListener('input', event => { event.currentTarget.querySelector('#lookup-error').textContent = ''; });
+    document.querySelector('#find-pass').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.innerHTML = icon('loader-circle') + 'Finding your pass...';
+      form.querySelector('#lookup-error').textContent = '';
+      paintIcons();
+      try {
+        const congregation = form.elements.namedItem('congregation').value.trim();
+        const result = await call('findPasses', { congregation, contact: form.elements.namedItem('contact').value });
+        if (form.isConnected) { state.lookup = { ...result, congregation }; renderFinder(); }
+      } catch (error) {
+        if (form.isConnected) form.querySelector('#lookup-error').textContent = friendlyLookupError(error);
+      } finally {
+        if (form.isConnected) {
+          button.disabled = false;
+          button.innerHTML = icon('ticket') + 'Find my pass';
+          paintIcons();
+        }
+      }
+    });
+  }
+  paintIcons();
+}
+function friendlyLookupError(error) {
+  return /Unknown request|timed out/i.test(error.message)
+    ? 'Pass lookup is being prepared. Please use your personal invitation link or approach registration.'
+    : error.message;
 }
 function mapUrl() { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(config.venueAddress || config.venue + ', Singapore')}`; }
 function renderProgram() {

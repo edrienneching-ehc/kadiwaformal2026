@@ -2,6 +2,7 @@ const KADIWA = {
   spreadsheetId: '1gut8zMibyILfxVe1-5XaD4x7M1MiI0AXdwevqfvpKSo',
   sourceSheet: 'Seating Arrangement',
   registrySheet: 'Event Passes',
+  responseSheet: 'Form Responses 1',
   siteUrl: 'https://edrienneching-ehc.github.io/kadiwaformal2026/',
   headers: ['Guest ID', 'Full Name', 'Local Congregation', 'Role', 'Table No', 'Pass Token', 'Checked In At', 'Checked In By', 'Active', 'Source Key', 'Personal Invitation Link']
 };
@@ -46,9 +47,12 @@ function doGet(event) {
 // A personal token allows lookup and arrival recording for that guest only.
 function eventRpc(method, args) {
   args = args || {};
-  if (method !== 'guest' && method !== 'checkIn') throw new Error('Unknown request.');
+  if (!['guest', 'checkIn', 'findPasses', 'openPass'].includes(method)) throw new Error('Unknown request.');
   if (PropertiesService.getScriptProperties().getProperty('SETUP_DONE') !== 'true') throw new Error('Guest passes are being prepared.');
-  if (typeof args !== 'object' || typeof args.token !== 'string' || !/^[a-f0-9]{64}$/.test(args.token)) throw new Error('Guest pass not found. Please approach the registration desk.');
+  if (!args || typeof args !== 'object') throw new Error('Invalid request.');
+  if (method === 'findPasses') return findPasses_(args);
+  if (method === 'openPass') return openPass_(args);
+  if (typeof args.token !== 'string' || !/^[a-f0-9]{64}$/.test(args.token)) throw new Error('Guest pass not found. Please approach the registration desk.');
   if (method === 'guest') return { guest: getGuest_(args.token) };
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -184,3 +188,83 @@ function guestObject_(row) {
 }
 
 function randomToken_() { return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); }
+
+function phoneKey_(value) {
+  const input = String(value || '').trim();
+  if (!/^\+?[\d\s().-]{8,30}$/.test(input)) return '';
+  let digits = input.replace(/\D/g, '').replace(/^00/, '');
+  if (digits.length === 10 && digits.indexOf('65') === 0) digits = digits.slice(2);
+  return /^\d{8,15}$/.test(digits) ? digits : '';
+}
+
+function registeredPhones_() {
+  const sheet = SpreadsheetApp.openById(KADIWA.spreadsheetId).getSheetByName(KADIWA.responseSheet);
+  if (!sheet) throw new Error('Pass lookup is being prepared. Please use your personal invitation link or approach registration.');
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = values.shift().map(value => value.trim());
+  const names = headers.map((header, index) => header === 'Full Name' ? index : -1).filter(index => index >= 0);
+  const contact = headers.indexOf('Contact Number');
+  const congregation = headers.indexOf('Local Congregation');
+  if (!names.length || contact < 0 || congregation < 0) throw new Error('Pass lookup is being prepared. Please approach registration.');
+  const result = {};
+  // Later responses replace older numbers for the same name and congregation.
+  values.forEach(row => {
+    const phone = phoneKey_(row[contact]);
+    names.forEach(index => {
+      if (String(row[index] || '').trim()) result[sourceKey_(row[index], row[congregation])] = phone;
+    });
+  });
+  return result;
+}
+
+function matchingPasses_(phone, congregation) {
+  const contacts = registeredPhones_();
+  const local = String(congregation).trim().toLowerCase().replace(/\s+/g, ' ');
+  const current = {};
+  readRoster_().forEach(guest => {
+    if (guest.congregation.trim().toLowerCase().replace(/\s+/g, ' ') === local && contacts[guest.key] === phone) current[guest.key] = guest;
+  });
+  return registryRows_().filter(row => current[row[9]]).map(row => ({ id: String(row[0]), name: current[row[9]].name, token: String(row[5]) }));
+}
+
+function lookupThrottle_(phone, congregation) {
+  const cache = CacheService.getScriptCache();
+  const bucket = Math.floor(Date.now() / 60000);
+  const key = 'lookup-' + bucket + '-' + hashLookup_(phone + '|' + congregation.trim().toLowerCase().replace(/\s+/g, ' '));
+  const globalKey = 'lookup-total-' + bucket;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const count = Number(cache.get(key) || 0);
+    const total = Number(cache.get(globalKey) || 0);
+    if (count >= 8 || total >= 300) throw new Error('Too many attempts. Please wait a minute and try again, or approach registration.');
+    cache.put(key, String(count + 1), 120);
+    cache.put(globalKey, String(total + 1), 120);
+  } finally { lock.releaseLock(); }
+}
+
+function findPasses_(args) {
+  const phone = phoneKey_(args.contact);
+  const congregation = String(args.congregation || '').trim();
+  if (!phone || !congregation || congregation.length > 100) throw new Error('Enter your local congregation and full registered contact number.');
+  lookupThrottle_(phone, congregation);
+  const matches = matchingPasses_(phone, congregation);
+  if (!matches.length) throw new Error('No matching pass was found. Check your congregation and registered contact number, or approach registration.');
+  const session = randomToken_();
+  CacheService.getScriptCache().put('pass-lookup-' + session, JSON.stringify({ phone: phone, congregation: congregation }), 1200);
+  return { lookupSession: session, guests: matches.map(guest => ({ id: guest.id, name: guest.name })) };
+}
+
+function openPass_(args) {
+  if (!/^[a-f0-9]{64}$/.test(String(args.lookupSession || ''))) throw new Error('Please find your pass again.');
+  const value = CacheService.getScriptCache().get('pass-lookup-' + args.lookupSession);
+  if (!value) throw new Error('Please find your pass again.');
+  const lookup = JSON.parse(value);
+  const guest = matchingPasses_(lookup.phone, lookup.congregation).find(guest => guest.id === args.id);
+  if (!guest) throw new Error('Please find your pass again.');
+  return { guest: getGuest_(guest.token) };
+}
+
+function hashLookup_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value, Utilities.Charset.UTF_8).map(byte => ('0' + (byte & 255).toString(16)).slice(-2)).join('');
+}

@@ -2,7 +2,7 @@
 
 Banner-themed personal QR passes, table assignments, program, reminders and guest self-check-in. GitHub Pages hosts the public site; a Google Apps Script web app reads the seating list and saves arrivals in **Event Passes**.
 
-The source has 170 people: 150 across 15 tables, and 20 with table `0`, displayed as **Registration desk**. The public site never includes the full guest list. The sample preview uses fictitious people and does not save real attendance.
+Table `0` displays **Registration desk**; table assignments come from the live seating list. The public build never includes real guest names or contact numbers. The sample preview uses fictitious people and does not save real attendance.
 
 ## Connect Google Sheets
 
@@ -16,6 +16,24 @@ The source has 170 people: 150 across 15 tables, and 20 with table `0`, displaye
 
 For an existing deployment, use **Deploy > Manage deployments > Edit > New version > Deploy** to keep the same URL. Saving code alone does not update a live deployment.
 
+## One QR For All Guests
+
+Shared QR image: [assets/event-qr.png](assets/event-qr.png)
+
+Guest lookup: https://edrienneching-ehc.github.io/kadiwaformal2026/?find=1
+
+Guests enter their **Local Congregation** and **full registered contact number**, then select their name from only matching records and open their personal pass. Opening it does not check them in. They tap **I'm here** on arrival.
+
+The backend reads **Form Responses 1**, matching its **Full Name**, **Contact Number** and **Local Congregation** columns to the current seating list. Duplicate Full Name columns are supported; later responses replace earlier numbers. Singapore numbers match with or without +65, spaces or hyphens. Other numbers must include the same country-code digits used during registration. Contacts remain in the private spreadsheet and are never returned to the browser or put in the URL.
+
+On October 3 the live seating list had 166 people, of whom 134 had a matching registered number. For guests without a match, use their existing personal invitation link or help them at registration. Missing or differently spelled names and congregations need organizer review; do not guess a match.
+
+Phone matching is a retrieval check, not SMS verification or proof of identity. Someone who knows another guest's number and congregation could retrieve their pass. Lookup requests are limited to eight per normalized number/congregation per minute and 300 total per minute; lookup sessions expire after 20 minutes. Cached session data remains on Google's servers.
+
+Before broadcasting this QR, update **Code.gs** and **Bridge.html**, save, then use **Deploy > Manage deployments > Edit > New version > Deploy**. Keep **Execute as: Me**, **Who has access: Anyone** and the existing /exec URL. No new setup, SMS service or manifest change is needed. Test a real lookup before sending the message in [BROADCAST.md](BROADCAST.md).
+
+Demo lookup: http://127.0.0.1:4173/?demo=1&find=1 (East / 81234567, fictitious guests only).
+
 ## Generate QR Passes
 
 1. In the spreadsheet choose **KADIWA Formal > Print / download guest passes**.
@@ -27,7 +45,7 @@ QR images are generated on your device, without sending guest details to a QR se
 
 After adding guests or changing tables, use **KADIWA Formal > Refresh guest passes from seating list** before generating passes. Table changes preserve tokens. Names plus congregations identify guests; correcting capitalization or spaces preserves a pass, but changing a name's spelling or congregation creates a new one. Reissue that person's pass. Do not sort or edit **Event Passes** while arrivals are being recorded.
 
-The private pass menu is available only to spreadsheet editors. There is no public roster, volunteer login or scanner dashboard.
+The private batch-print menu is available only to spreadsheet editors. Shared-QR lookup reveals only names matching a supplied congregation and registered contact number; there is no browsable public roster, volunteer login or scanner dashboard.
 
 ## Guest Self-Check-In
 
