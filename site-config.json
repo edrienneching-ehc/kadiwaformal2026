@@ -8,5 +8,19 @@
   "venue": "The Legacy @ One North",
   "venueAddress": "",
   "program": [],
-  "reminders": []
+  "reminders": [
+    {
+      "title": "Arrive on time",
+      "text": "Please arrive on time for the 5:00 PM start."
+    },
+    {
+      "title": "Proper attire",
+      "text": "Please wear proper attire appropriate for KADIWA Formal."
+    },
+    {
+      "title": "Photos and videos",
+      "text": "Please refrain from posting photos or videos of the event on social media until the official activity has aired on the official Church pages."
+    }
+  ],
+  "directions": []
 }

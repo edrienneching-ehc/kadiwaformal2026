@@ -111,7 +111,7 @@ function renderProgram() {
 function renderReminders() {
   document.querySelector('#guest-panel').innerHTML = `<div class="information-panel"><p class="eyebrow">BEFORE YOU ARRIVE</p><h2>Reminders</h2>
     ${config.reminders.length ? '<ul class="reminder-list">' + config.reminders.map(item => `<li><h3>${e(item.title)}</h3><p>${e(item.text)}</p></li>`).join('') + '</ul>' : '<p class="pending-note">Event reminders will be posted soon.</p>'}
-    <div class="venue-details">${icon('map-pin')}<div><h3>${e(config.venue)}</h3><p>${e(dateText)} · ${e(timeText)}</p>${config.venueAddress ? '<p>' + e(config.venueAddress) + '</p>' : ''}<a href="${e(mapUrl())}" target="_blank" rel="noopener noreferrer">View on Google Maps</a></div></div></div>`;
+    <div class="venue-details">${icon('map-pin')}<div><h3>Getting there</h3><p>${e(config.venue)}</p>${config.venueAddress ? '<p>' + e(config.venueAddress) + '</p>' : ''}${config.directions?.length ? '<ol class="directions-list">' + config.directions.map(step => '<li>' + e(step) + '</li>').join('') + '</ol>' : ''}<a href="${e(mapUrl())}" target="_blank" rel="noopener noreferrer">View on Google Maps</a></div></div></div>`;
   paintIcons();
 }
 function download(content, type, filename) {

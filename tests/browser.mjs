@@ -26,7 +26,9 @@ try {
     await page.getByRole('button', { name: 'Program', exact: true }).click();
     await page.getByText('The full program will be posted soon.').waitFor();
     await page.getByRole('button', { name: 'Reminders', exact: true }).click();
-    await page.getByText('Event reminders will be posted soon.').waitFor();
+    await page.getByRole('heading', { name: 'Photos and videos', exact: true }).waitFor();
+    await page.getByText('Please arrive on time for the 5:00 PM start.', { exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Getting there', exact: true }).waitFor();
     await page.close();
   }
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
